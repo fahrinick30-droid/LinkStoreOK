@@ -105,6 +105,10 @@
             const [error, setError] = useState(null);
             const [appNotification, setAppNotification] = useState('');
             
+            // State untuk menyembunyikan akses admin
+            const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+            const [logoClicks, setLogoClicks] = useState(0);
+
             const [deleteTarget, setDeleteTarget] = useState(null);
             const [previewImage, setPreviewImage] = useState(null);
             const [cropData, setCropData] = useState({ show: false, src: null, scale: 1, x: 0, y: 0 });
@@ -154,8 +158,26 @@
             useEffect(() => {
                 fetchData();
                 const interval = setInterval(fetchData, 30000); 
+                
+                // Cek secret hash di URL untuk buka admin (Contoh: index.html#admin)
+                if (window.location.hash === '#admin') {
+                    setIsAdminUnlocked(true);
+                }
+
                 return () => clearInterval(interval);
             }, []);
+
+            const handleLogoClick = () => {
+                const newClicks = logoClicks + 1;
+                setLogoClicks(newClicks);
+                if (newClicks >= 5) {
+                    setIsAdminUnlocked(true);
+                    setAppNotification("MODE ADMIN DIAKTIFKAN");
+                    setTimeout(() => setAppNotification(''), 2000);
+                }
+                // Reset klik jika tidak dilanjutkan dalam 2 detik
+                setTimeout(() => setLogoClicks(0), 2000);
+            };
 
             const handlePost = async (payload) => {
                 try {
@@ -254,20 +276,7 @@
             const handleMouseUp = () => { setIsDragging(false); };
 
             const formatIDR = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
-            const formatPhoneDisplay = (phone) => {
-                let p = String(phone || '').trim();
-                if (!p) return '';
-                return p.startsWith('0') ? p : '0' + p;
-            };
-
-            const getWALink = (phone, text) => {
-                const phoneStr = formatPhoneDisplay(phone);
-                const cleanPhone = phoneStr.replace(/\D/g, '');
-                if (!cleanPhone) return '#';
-                const apiPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
-                return `https://wa.me/${apiPhone}?text=${encodeURIComponent(text)}`;
-            };
-
+            
             const openProductLink = (url) => {
                 if (url) {
                     window.open(url, '_blank');
@@ -291,15 +300,24 @@
                     )}
 
                     <nav className="bg-white border-b sticky top-0 z-20 px-6 h-16 flex items-center justify-between shadow-sm">
-                        <div className="flex items-center gap-2 font-bold text-emerald-600 text-xl cursor-pointer select-none" onClick={() => setView('store')}>
+                        {/* Logo sebagai pemicu rahasia klik 5x */}
+                        <div 
+                            className="flex items-center gap-2 font-bold text-emerald-600 text-xl cursor-default select-none" 
+                            onClick={handleLogoClick}
+                        >
                             <Icon name="shopping-bag" className="text-emerald-600" /> 
                             <span>LinkStore</span>
                         </div>
+                        
                         <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
                             <button onClick={() => setView('store')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'store' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>Toko</button>
-                            <button onClick={() => { setView('admin'); fetchData(); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all relative ${view === 'admin' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>
-                                Admin {pendingCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full border border-white notif-badge font-bold">{pendingCount}</span>}
-                            </button>
+                            
+                            {/* Tombol Admin hanya muncul jika Unlocked secara rahasia */}
+                            {isAdminUnlocked && (
+                                <button onClick={() => { setView('admin'); fetchData(); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all relative ${view === 'admin' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>
+                                    Admin {pendingCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full border border-white notif-badge font-bold">{pendingCount}</span>}
+                                </button>
+                            )}
                         </div>
                     </nav>
 
@@ -319,7 +337,7 @@
                             </div>
                         ) : (
                             <>
-                                {view === 'admin' ? (
+                                {view === 'admin' && isAdminUnlocked ? (
                                     <div className="animate-in space-y-6">
                                         <div className="flex gap-4 border-b pb-1 overflow-x-auto whitespace-nowrap">
                                             <button onClick={() => setAdminTab('products')} className={`pb-4 px-2 text-sm font-bold ${adminTab === 'products' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-slate-400'}`}>Produk</button>
@@ -469,7 +487,7 @@
 
                     {deleteTarget && (
                         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in zoom-in">
-                            <div className="bg-white w-full max-w-sm rounded-3xl p-8 text-center space-y-6 shadow-2xl border-2">
+                            <div className="bg-white w-full max-sm rounded-3xl p-8 text-center space-y-6 shadow-2xl border-2">
                                 <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto"><Icon name="trash-2" size={32} /></div>
                                 <div><h3 className="text-xl font-bold text-slate-800">Hapus Produk?</h3><p className="text-slate-500 text-sm mt-2">Menghapus <b className="text-slate-700">{deleteTarget.name}</b> secara permanen.</p></div>
                                 <div className="flex gap-3 pt-2">
